@@ -7,28 +7,39 @@ dotenv.config()
 const app = express()
 app.use(express.json())
 
-const translateClient = new TranslateClient({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
+// 🔁 Простой маршрут для проверки из браузера
+app.get('/', (req, res) => {
+  res.send('✅ Привет из Render — сервер работает!')
 })
 
+// 🔁 Основной маршрут перевода
 app.post('/translate', async (req, res) => {
   const { text, from = 'auto', to = 'ru' } = req.body
 
+  if (!text) {
+    return res.status(400).json({ error: 'No text provided' })
+  }
+
   try {
+    const client = new TranslateClient({
+      region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+      }
+    })
+
     const command = new TranslateTextCommand({
       Text: text,
       SourceLanguageCode: from,
-      TargetLanguageCode: to,
+      TargetLanguageCode: to
     })
 
-    const response = await translateClient.send(command)
+    const response = await client.send(command)
+
     res.json({ translated: response.TranslatedText })
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error('❌ Translation error:', error)
     res.status(500).json({ error: 'Translation failed' })
   }
 })
