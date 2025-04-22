@@ -16,19 +16,25 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Safe single-comment translation server running')
+  res.send('✅ Directional translation server running')
 })
 
 app.post('/translate', async (req, res) => {
-  const { text, from = 'auto', to = 'ru', ticket_id, public: isPublic } = req.body
+  const { text, from = 'auto', to = 'ru', ticket_id, public: isPublic, origin } = req.body
 
   if (!text || !ticket_id) {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
   }
 
-  // 🔐 Стоп любые комментарии от AI
+  // 🔒 Полная защита от AI-циклов
   if (text.includes('[AI] [')) {
     console.log('⛔ Skipping AI-generated comment')
+    return res.status(200).json({ skipped: true })
+  }
+
+  // 🔒 Предотвратить повторный public-перевод на клиентском вызове
+  if (origin === 'client' && isPublic === true) {
+    console.log('⛔ Blocked client-originated public comment')
     return res.status(200).json({ skipped: true })
   }
 
@@ -67,7 +73,7 @@ ${translated}`
       { headers: authHeader }
     )
 
-    res.json({ translated, comment: 'merged', public: isPublic })
+    res.json({ translated, direction: `${from}→${to}`, origin })
   } catch (error) {
     console.error('❌ Translation or Zendesk update error:', error?.response?.data || error.message)
     res.status(500).json({ error: 'Translation or update failed' })
@@ -75,4 +81,4 @@ ${translated}`
 })
 
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`🚀 Safe one-comment server running on port ${PORT}`))
+app.listen(PORT, () => console.log(`🚀 Directional-safe server running on port ${PORT}`))
