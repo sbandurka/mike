@@ -16,7 +16,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ TrueStable translation server running')
+  res.send('✅ DualBlock server running — one comment per message')
 })
 
 app.post('/translate', async (req, res) => {
@@ -26,7 +26,6 @@ app.post('/translate', async (req, res) => {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
   }
 
-  // ✅ Минимальная, но достаточная защита
   if (
     text.includes('[AI] [Auto-translated') ||
     text.includes('[AI] [Original from')
@@ -45,46 +44,32 @@ app.post('/translate', async (req, res) => {
     const response = await translateClient.send(command)
     const translated = response.TranslatedText
 
+    const combinedBody = `[AI] [${from} → ${to}]
+Оригинал:
+${text}
+
+Перевод:
+${translated}`
+
     const authHeader = {
       'Content-Type': 'application/json',
       Authorization: "Basic " + Buffer.from(`${process.env.ZENDESK_EMAIL}/token:${process.env.ZENDESK_API_TOKEN}`).toString("base64")
     }
 
-    const actions = []
+    await axios.put(
+      `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
+      {
+        ticket: {
+          comment: {
+            body: combinedBody,
+            public: isPublic
+          }
+        }
+      },
+      { headers: authHeader }
+    )
 
-    if (isPublic === true) {
-      actions.push({
-        body: `[AI] [Original in ${from}]
-${text}`,
-        public: false
-      })
-      actions.push({
-        body: `[AI] [Auto-translated]
-${translated}`,
-        public: true
-      })
-    } else {
-      actions.push({
-        body: `[AI] [Original from client in ${from}]
-${text}`,
-        public: false
-      })
-      actions.push({
-        body: `[AI] [Auto-translated from client]
-${translated}`,
-        public: false
-      })
-    }
-
-    for (const comment of actions) {
-      await axios.put(
-        `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
-        { ticket: { comment } },
-        { headers: authHeader }
-      )
-    }
-
-    res.json({ translated, direction: isPublic ? 'agent_to_client' : 'client_to_agent' })
+    res.json({ translated, mode: 'single-comment', public: isPublic })
   } catch (error) {
     console.error('❌ Translation or Zendesk update error:', error?.response?.data || error.message)
     res.status(500).json({ error: 'Translation or update failed' })
@@ -92,4 +77,4 @@ ${translated}`,
 })
 
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`🚀 TrueStable server running on port ${PORT}`))
+app.listen(PORT, () => console.log(`🚀 DualBlock server running on port ${PORT}`))
