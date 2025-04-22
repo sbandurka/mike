@@ -81,26 +81,36 @@ ${translated}`
 })
 
 const PORT = process.env.PORT || 3000
-// 🔍 Временный тест перевода с корейского на русский
-app.get('/test-ko-ru', async (req, res) => {
-  try {
-    const testText = '안녕하세요! 제 주문이 어디에 있는지 알려주세요?'
+// 🐞 Отладочный маршрут перевода без обновления тикета
+app.post('/translate-debug', async (req, res) => {
+  const { text, from = 'auto', to = 'ru' } = req.body
 
+  if (!text) {
+    return res.status(400).json({ error: 'Missing text for translation' })
+  }
+
+  console.log(`📤 [DEBUG] Переводим: "${text}" (${from} → ${to})`)
+
+  try {
     const command = new TranslateTextCommand({
-      Text: testText,
-      SourceLanguageCode: 'ko',
-      TargetLanguageCode: 'ru'
+      Text: text,
+      SourceLanguageCode: from,
+      TargetLanguageCode: to
     })
 
     const response = await translateClient.send(command)
 
+    console.log(`✅ [DEBUG] Перевод: "${response.TranslatedText}"`)
+
     res.json({
-      original: testText,
-      translated: response.TranslatedText
+      original: text,
+      translated: response.TranslatedText,
+      from,
+      to
     })
   } catch (error) {
-    console.error('❌ Ошибка тестового перевода:', error?.message)
-    res.status(500).json({ error: 'Ошибка при тестовом переводе' })
+    console.error('❌ [DEBUG] Ошибка при переводе:', error?.message || error)
+    res.status(500).json({ error: 'Translation failed' })
   }
 })
 
