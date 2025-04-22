@@ -17,7 +17,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Server running with full anti-loop and redundancy protection')
+  res.send('✅ Server running with max anti-loop & smart checks')
 })
 
 app.post('/translate', async (req, res) => {
@@ -33,6 +33,11 @@ app.post('/translate', async (req, res) => {
     text.startsWith('[Original')
   ) {
     console.log('⛔ Skipping AI-generated or system comment.')
+    return res.status(200).json({ skipped: true })
+  }
+
+  if (from === to) {
+    console.log('⛔ Skipping same-language translation (from == to)')
     return res.status(200).json({ skipped: true })
   }
 
@@ -124,4 +129,4 @@ ${translated}`,
 })
 
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`))
+app.listen(PORT, () => console.log(`🚀 server_vfinal running on port ${PORT}`))
