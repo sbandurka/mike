@@ -4,7 +4,6 @@ import dotenv from 'dotenv'
 import axios from 'axios'
 
 dotenv.config()
-
 const app = express()
 app.use(express.json())
 
@@ -17,7 +16,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Server running with max anti-loop & smart checks')
+  res.send('✅ Ultrafinal server with all anti-loop logic active')
 })
 
 app.post('/translate', async (req, res) => {
@@ -27,15 +26,19 @@ app.post('/translate', async (req, res) => {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
   }
 
+  // Защита: Префикс AI / Автоперевод / Оригинал
   if (
     text.startsWith('[AI]') ||
     text.startsWith('[Auto-translated]') ||
-    text.startsWith('[Original')
+    text.startsWith('[Original') ||
+    text.includes('[Original in') ||
+    text.includes('[Original from')
   ) {
-    console.log('⛔ Skipping AI-generated or system comment.')
+    console.log('⛔ Skipping AI/system/quoted comment.')
     return res.status(200).json({ skipped: true })
   }
 
+  // Защита: язык одинаковый
   if (from === to) {
     console.log('⛔ Skipping same-language translation (from == to)')
     return res.status(200).json({ skipped: true })
@@ -51,6 +54,7 @@ app.post('/translate', async (req, res) => {
     const response = await translateClient.send(command)
     const translated = response.TranslatedText
 
+    // Защита: если результат перевода равен исходному
     if (text.trim() === translated.trim()) {
       console.log('⛔ Skipping redundant translation (text equals translated)')
       return res.status(200).json({ skipped: true })
@@ -129,4 +133,4 @@ ${translated}`,
 })
 
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`🚀 server_vfinal running on port ${PORT}`))
+app.listen(PORT, () => console.log(`🚀 Ultrafinal server running on port ${PORT}`))
