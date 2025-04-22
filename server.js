@@ -27,7 +27,6 @@ app.post('/translate', async (req, res) => {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
   }
 
-  // 🔁 Защита от зацикливания — игнорируем, если это уже автоперевод
   if (text.startsWith('[Auto-translated]') || text.startsWith('[Original')) {
     console.log('⛔ Skipping already translated or original comment.')
     return res.status(200).json({ skipped: true })
@@ -45,18 +44,17 @@ app.post('/translate', async (req, res) => {
 
     const authHeader = {
       'Content-Type': 'application/json',
-      Authorization: `Basic ${Buffer.from(\`\${process.env.ZENDESK_EMAIL}/token:\${process.env.ZENDESK_API_TOKEN}\`).toString('base64')}`
+      Authorization: "Basic " + Buffer.from(`${process.env.ZENDESK_EMAIL}/token:${process.env.ZENDESK_API_TOKEN}`).toString("base64")
     }
 
-    // 🔄 Если public = true → агент пишет → отправляем оригинал как private, перевод как public
     if (isPublic === true) {
-      // 1. Сохраняем оригинал как внутренний
       await axios.put(
-        \`https://\${process.env.ZENDESK_DOMAIN}/api/v2/tickets/\${ticket_id}.json\`,
+        `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
         {
           ticket: {
             comment: {
-              body: `[Original in ${from}]\n${text}`,
+              body: `[Original in ${from}]
+${text}`,
               public: false
             }
           }
@@ -64,13 +62,13 @@ app.post('/translate', async (req, res) => {
         { headers: authHeader }
       )
 
-      // 2. Отправляем перевод как публичный
       const zendeskRes = await axios.put(
-        \`https://\${process.env.ZENDESK_DOMAIN}/api/v2/tickets/\${ticket_id}.json\`,
+        `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
         {
           ticket: {
             comment: {
-              body: `[Auto-translated]\n${translated}`,
+              body: `[Auto-translated]
+${translated}`,
               public: true
             }
           }
@@ -79,17 +77,14 @@ app.post('/translate', async (req, res) => {
       )
 
       return res.json({ translated, direction: 'agent_to_client', zendesk_response: zendeskRes.data })
-    }
-
-    // 🔄 Если public = false → клиент пишет → всё отправляется как внутреннее
-    else {
-      // 1. Оригинал
+    } else {
       await axios.put(
-        \`https://\${process.env.ZENDESK_DOMAIN}/api/v2/tickets/\${ticket_id}.json\`,
+        `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
         {
           ticket: {
             comment: {
-              body: `[Original from client in ${from}]\n${text}`,
+              body: `[Original from client in ${from}]
+${text}`,
               public: false
             }
           }
@@ -97,13 +92,13 @@ app.post('/translate', async (req, res) => {
         { headers: authHeader }
       )
 
-      // 2. Перевод
       const zendeskRes = await axios.put(
-        \`https://\${process.env.ZENDESK_DOMAIN}/api/v2/tickets/\${ticket_id}.json\`,
+        `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
         {
           ticket: {
             comment: {
-              body: `[Auto-translated from client]\n${translated}`,
+              body: `[Auto-translated from client]
+${translated}`,
               public: false
             }
           }
