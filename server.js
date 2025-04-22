@@ -17,7 +17,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Unified server running with anti-loop protection')
+  res.send('✅ Server running with AI-tagged anti-loop logic')
 })
 
 app.post('/translate', async (req, res) => {
@@ -27,8 +27,12 @@ app.post('/translate', async (req, res) => {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
   }
 
-  if (text.startsWith('[Auto-translated]') || text.startsWith('[Original')) {
-    console.log('⛔ Skipping already translated or original comment.')
+  if (
+    text.startsWith('[AI]') ||
+    text.startsWith('[Auto-translated]') ||
+    text.startsWith('[Original')
+  ) {
+    console.log('⛔ Skipping AI-generated or system comment.')
     return res.status(200).json({ skipped: true })
   }
 
@@ -53,7 +57,7 @@ app.post('/translate', async (req, res) => {
         {
           ticket: {
             comment: {
-              body: `[Original in ${from}]
+              body: `[AI] [Original in ${from}]
 ${text}`,
               public: false
             }
@@ -67,7 +71,7 @@ ${text}`,
         {
           ticket: {
             comment: {
-              body: `[Auto-translated]
+              body: `[AI] [Auto-translated]
 ${translated}`,
               public: true
             }
@@ -83,7 +87,7 @@ ${translated}`,
         {
           ticket: {
             comment: {
-              body: `[Original from client in ${from}]
+              body: `[AI] [Original from client in ${from}]
 ${text}`,
               public: false
             }
@@ -97,7 +101,7 @@ ${text}`,
         {
           ticket: {
             comment: {
-              body: `[Auto-translated from client]
+              body: `[AI] [Auto-translated from client]
 ${translated}`,
               public: false
             }
@@ -115,4 +119,4 @@ ${translated}`,
 })
 
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`🚀 Unified server running on port ${PORT}`))
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`))
