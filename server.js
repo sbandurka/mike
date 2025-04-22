@@ -16,7 +16,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ DualBlock server running — one comment per message')
+  res.send('✅ Safe single-comment translation server running')
 })
 
 app.post('/translate', async (req, res) => {
@@ -26,11 +26,9 @@ app.post('/translate', async (req, res) => {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
   }
 
-  if (
-    text.includes('[AI] [Auto-translated') ||
-    text.includes('[AI] [Original from')
-  ) {
-    console.log('⛔ Skipping previously processed comment')
+  // 🔐 Стоп любые комментарии от AI
+  if (text.includes('[AI] [')) {
+    console.log('⛔ Skipping AI-generated comment')
     return res.status(200).json({ skipped: true })
   }
 
@@ -69,7 +67,7 @@ ${translated}`
       { headers: authHeader }
     )
 
-    res.json({ translated, mode: 'single-comment', public: isPublic })
+    res.json({ translated, comment: 'merged', public: isPublic })
   } catch (error) {
     console.error('❌ Translation or Zendesk update error:', error?.response?.data || error.message)
     res.status(500).json({ error: 'Translation or update failed' })
@@ -77,4 +75,4 @@ ${translated}`
 })
 
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`🚀 DualBlock server running on port ${PORT}`))
+app.listen(PORT, () => console.log(`🚀 Safe one-comment server running on port ${PORT}`))
