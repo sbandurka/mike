@@ -16,7 +16,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Minimal final translation server running')
+  res.send('✅ TrueStable translation server running')
 })
 
 app.post('/translate', async (req, res) => {
@@ -26,8 +26,12 @@ app.post('/translate', async (req, res) => {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
   }
 
-  if (text.includes('[AI] [Auto-translated')) {
-    console.log('⛔ Skipping re-translation of AI-generated message')
+  // ✅ Минимальная, но достаточная защита
+  if (
+    text.includes('[AI] [Auto-translated') ||
+    text.includes('[AI] [Original from')
+  ) {
+    console.log('⛔ Skipping previously processed comment')
     return res.status(200).json({ skipped: true })
   }
 
@@ -88,4 +92,4 @@ ${translated}`,
 })
 
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`🚀 Minimal final server running on port ${PORT}`))
+app.listen(PORT, () => console.log(`🚀 TrueStable server running on port ${PORT}`))
