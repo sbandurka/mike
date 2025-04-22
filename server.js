@@ -8,7 +8,6 @@ dotenv.config()
 const app = express()
 app.use(express.json())
 
-// AWS Translate
 const translateClient = new TranslateClient({
   region: process.env.AWS_REGION,
   credentials: {
@@ -18,7 +17,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Сервер работает и ждёт Webhook')
+  res.send('✅ Сервер работает и готов принимать Zendesk Webhook')
 })
 
 app.post('/translate', async (req, res) => {
@@ -38,10 +37,9 @@ app.post('/translate', async (req, res) => {
     const response = await translateClient.send(command)
     const translated = response.TranslatedText
 
-    // Отправляем перевод обратно в тикет (приватный комментарий)
-    await axios({
+    const zendeskRes = await axios({
       method: 'PUT',
-      url: `https://perfectsystems.zendesk.com/api/v2/tickets/${ticket_id}.json`,
+      url: `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Basic ${Buffer.from(`${process.env.ZENDESK_EMAIL}/token:${process.env.ZENDESK_API_TOKEN}`).toString('base64')}`
@@ -56,9 +54,9 @@ app.post('/translate', async (req, res) => {
       }
     })
 
-    res.json({ translated, sent_to_zendesk: true })
+    res.json({ translated, zendesk_response: zendeskRes.data })
   } catch (error) {
-    console.error('❌ Translation or Zendesk update error:', error?.response?.data || error.message)
+    console.error('❌ Ошибка перевода или записи в Zendesk:', error?.response?.data || error.message)
     res.status(500).json({ error: 'Translation or update failed' })
   }
 })
