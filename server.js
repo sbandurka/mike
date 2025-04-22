@@ -16,7 +16,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Ultrafinal server with all anti-loop logic active')
+  res.send('✅ Ultralock server running with tag-based anti-loop')
 })
 
 app.post('/translate', async (req, res) => {
@@ -26,7 +26,6 @@ app.post('/translate', async (req, res) => {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
   }
 
-  // Защита: Префикс AI / Автоперевод / Оригинал
   if (
     text.startsWith('[AI]') ||
     text.startsWith('[Auto-translated]') ||
@@ -38,7 +37,6 @@ app.post('/translate', async (req, res) => {
     return res.status(200).json({ skipped: true })
   }
 
-  // Защита: язык одинаковый
   if (from === to) {
     console.log('⛔ Skipping same-language translation (from == to)')
     return res.status(200).json({ skipped: true })
@@ -54,7 +52,6 @@ app.post('/translate', async (req, res) => {
     const response = await translateClient.send(command)
     const translated = response.TranslatedText
 
-    // Защита: если результат перевода равен исходному
     if (text.trim() === translated.trim()) {
       console.log('⛔ Skipping redundant translation (text equals translated)')
       return res.status(200).json({ skipped: true })
@@ -65,67 +62,57 @@ app.post('/translate', async (req, res) => {
       Authorization: "Basic " + Buffer.from(`${process.env.ZENDESK_EMAIL}/token:${process.env.ZENDESK_API_TOKEN}`).toString("base64")
     }
 
+    const comments = []
+
     if (isPublic === true) {
-      await axios.put(
-        `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
-        {
-          ticket: {
-            comment: {
-              body: `[AI] [Original in ${from}]
+      comments.push({
+        comment: {
+          body: `[AI] [Original in ${from}]
 ${text}`,
-              public: false
-            }
-          }
-        },
-        { headers: authHeader }
-      )
-
-      const zendeskRes = await axios.put(
-        `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
-        {
-          ticket: {
-            comment: {
-              body: `[AI] [Auto-translated]
+          public: false
+        }
+      })
+      comments.push({
+        comment: {
+          body: `[AI] [Auto-translated]
 ${translated}`,
-              public: true
-            }
-          }
-        },
-        { headers: authHeader }
-      )
-
-      return res.json({ translated, direction: 'agent_to_client', zendesk_response: zendeskRes.data })
+          public: true
+        }
+      })
     } else {
+      comments.push({
+        comment: {
+          body: `[AI] [Original from client in ${from}]
+${text}`,
+          public: false
+        }
+      })
+      comments.push({
+        comment: {
+          body: `[AI] [Auto-translated from client]
+${translated}`,
+          public: false
+        }
+      })
+    }
+
+    // Apply each comment and add tag after the last one
+    for (let i = 0; i < comments.length; i++) {
+      const update = {
+        ticket: {
+          ...comments[i],
+          tags: i === comments.length - 1 ? ['ai_translated'] : undefined
+        }
+      }
+
       await axios.put(
         `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
-        {
-          ticket: {
-            comment: {
-              body: `[AI] [Original from client in ${from}]
-${text}`,
-              public: false
-            }
-          }
-        },
+        update,
         { headers: authHeader }
       )
-
-      const zendeskRes = await axios.put(
-        `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
-        {
-          ticket: {
-            comment: {
-              body: `[AI] [Auto-translated from client]
-${translated}`,
-              public: false
-            }
-          }
-        },
-        { headers: authHeader }
-      )
-
-      return res.json({ translated, direction: 'client_to_agent', zendesk_response: zendeskRes.data })
     }
+
+    res.json({ translated, tag: 'ai_translated', comments: comments.length })
   } catch (error) {
     console.error('❌ Translation or Zendesk update error:', error?.response?.data || error.message)
     res.status(500).json({ error: 'Translation or update failed' })
@@ -133,4 +120,4 @@ ${translated}`,
 })
 
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`🚀 Ultrafinal server running on port ${PORT}`))
+app.listen(PORT, () => console.log(`🚀 Ultralock server running on port ${PORT}`))
