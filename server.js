@@ -81,4 +81,27 @@ ${translated}`
 })
 
 const PORT = process.env.PORT || 3000
+// 🔍 Временный тест перевода с корейского на русский
+app.get('/test-ko-ru', async (req, res) => {
+  try {
+    const testText = '안녕하세요! 제 주문이 어디에 있는지 알려주세요?'
+
+    const command = new TranslateTextCommand({
+      Text: testText,
+      SourceLanguageCode: 'ko',
+      TargetLanguageCode: 'ru'
+    })
+
+    const response = await translateClient.send(command)
+
+    res.json({
+      original: testText,
+      translated: response.TranslatedText
+    })
+  } catch (error) {
+    console.error('❌ Ошибка тестового перевода:', error?.message)
+    res.status(500).json({ error: 'Ошибка при тестовом переводе' })
+  }
+})
+
 app.listen(PORT, () => console.log(`🚀 Directional-safe server running on port ${PORT}`))
