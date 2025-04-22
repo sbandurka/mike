@@ -17,11 +17,11 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Сервер работает и готов принимать Zendesk Webhook')
+  res.send('✅ Сервер работает и поддерживает двунаправочный перевод')
 })
 
 app.post('/translate', async (req, res) => {
-  const { text, from = 'auto', to = 'ru', ticket_id } = req.body
+  const { text, from = 'auto', to = 'ru', ticket_id, public: isPublic } = req.body
 
   if (!text || !ticket_id) {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
@@ -37,6 +37,7 @@ app.post('/translate', async (req, res) => {
     const response = await translateClient.send(command)
     const translated = response.TranslatedText
 
+    // Отправка перевода в тикет
     const zendeskRes = await axios({
       method: 'PUT',
       url: `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
@@ -48,7 +49,7 @@ app.post('/translate', async (req, res) => {
         ticket: {
           comment: {
             body: `[Auto-translated]\n${translated}`,
-            public: false
+            public: isPublic === true // публичный комментарий от агента
           }
         }
       }
