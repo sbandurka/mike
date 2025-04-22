@@ -17,7 +17,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Server running with AI-tagged anti-loop logic')
+  res.send('✅ Server running with full anti-loop and redundancy protection')
 })
 
 app.post('/translate', async (req, res) => {
@@ -45,6 +45,11 @@ app.post('/translate', async (req, res) => {
 
     const response = await translateClient.send(command)
     const translated = response.TranslatedText
+
+    if (text.trim() === translated.trim()) {
+      console.log('⛔ Skipping redundant translation (text equals translated)')
+      return res.status(200).json({ skipped: true })
+    }
 
     const authHeader = {
       'Content-Type': 'application/json',
