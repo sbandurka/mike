@@ -17,11 +17,11 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Server is running and supports split comment translation')
+  res.send('✅ Server is running and supports client-to-agent translation')
 })
 
 app.post('/translate', async (req, res) => {
-  const { text, from = 'auto', to = 'ru', ticket_id, public: isPublic } = req.body
+  const { text, from = 'ko', to = 'ru', ticket_id, public: isPublic } = req.body
 
   if (!text || !ticket_id) {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
@@ -37,29 +37,26 @@ app.post('/translate', async (req, res) => {
     const response = await translateClient.send(command)
     const translated = response.TranslatedText
 
-    // Если публичный комментарий — значит от агента, сохраняем оригинал как внутренний
-    if (isPublic) {
-      // 1. Сохраняем оригинал как внутренний комментарий
-      await axios({
-        method: 'PUT',
-        url: `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Basic ${Buffer.from(`${process.env.ZENDESK_EMAIL}/token:${process.env.ZENDESK_API_TOKEN}`).toString('base64')}`
-        },
-        data: {
-          ticket: {
-            comment: {
-              body: `[Original in ${from}]
+    // 1. Сохраняем оригинал клиента как внутренний комментарий
+    await axios({
+      method: 'PUT',
+      url: `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Basic ${Buffer.from(`${process.env.ZENDESK_EMAIL}/token:${process.env.ZENDESK_API_TOKEN}`).toString('base64')}`
+      },
+      data: {
+        ticket: {
+          comment: {
+            body: `[Original from client in ${from}]
 ${text}`,
-              public: false
-            }
+            public: false
           }
         }
-      })
-    }
+      }
+    })
 
-    // 2. Отправляем перевод как публичный (если public=true) или внутренний (если false)
+    // 2. Добавляем перевод тоже как приватный комментарий
     const zendeskRes = await axios({
       method: 'PUT',
       url: `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
@@ -70,9 +67,9 @@ ${text}`,
       data: {
         ticket: {
           comment: {
-            body: `[Auto-translated]
+            body: `[Auto-translated from client]
 ${translated}`,
-            public: isPublic === true
+            public: false
           }
         }
       }
