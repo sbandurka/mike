@@ -17,7 +17,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Сервер работает и поддерживает двунаправочный перевод')
+  res.send('✅ Server is running and supports split comment translation')
 })
 
 app.post('/translate', async (req, res) => {
@@ -37,7 +37,29 @@ app.post('/translate', async (req, res) => {
     const response = await translateClient.send(command)
     const translated = response.TranslatedText
 
-    // Отправка перевода в тикет
+    // Если публичный комментарий — значит от агента, сохраняем оригинал как внутренний
+    if (isPublic) {
+      // 1. Сохраняем оригинал как внутренний комментарий
+      await axios({
+        method: 'PUT',
+        url: `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Basic ${Buffer.from(`${process.env.ZENDESK_EMAIL}/token:${process.env.ZENDESK_API_TOKEN}`).toString('base64')}`
+        },
+        data: {
+          ticket: {
+            comment: {
+              body: `[Original in ${from}]
+${text}`,
+              public: false
+            }
+          }
+        }
+      })
+    }
+
+    // 2. Отправляем перевод как публичный (если public=true) или внутренний (если false)
     const zendeskRes = await axios({
       method: 'PUT',
       url: `https://${process.env.ZENDESK_DOMAIN}/api/v2/tickets/${ticket_id}.json`,
@@ -48,8 +70,9 @@ app.post('/translate', async (req, res) => {
       data: {
         ticket: {
           comment: {
-            body: `[Auto-translated]\n${translated}`,
-            public: isPublic === true // публичный комментарий от агента
+            body: `[Auto-translated]
+${translated}`,
+            public: isPublic === true
           }
         }
       }
@@ -57,7 +80,7 @@ app.post('/translate', async (req, res) => {
 
     res.json({ translated, zendesk_response: zendeskRes.data })
   } catch (error) {
-    console.error('❌ Ошибка перевода или записи в Zendesk:', error?.response?.data || error.message)
+    console.error('❌ Translation or Zendesk update error:', error?.response?.data || error.message)
     res.status(500).json({ error: 'Translation or update failed' })
   }
 })
