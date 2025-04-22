@@ -1,14 +1,15 @@
 import express from 'express'
 import { TranslateClient, TranslateTextCommand } from '@aws-sdk/client-translate'
 import dotenv from 'dotenv'
+import axios from 'axios'
 
 dotenv.config()
 
 const app = express()
 app.use(express.json())
 
-// 🔧 AWS Translate client создаётся один раз
-const client = new TranslateClient({
+// AWS Translate
+const translateClient = new TranslateClient({
   region: process.env.AWS_REGION,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -16,17 +17,15 @@ const client = new TranslateClient({
   }
 })
 
-// 🔁 Простой маршрут для проверки из браузера
 app.get('/', (req, res) => {
-  res.send('✅ Привет из Render — сервер работает!')
+  res.send('✅ Сервер работает и ждёт Webhook')
 })
 
-// 🔁 Основной маршрут перевода
 app.post('/translate', async (req, res) => {
-  const { text, from = 'auto', to = 'ru' } = req.body
+  const { text, from = 'auto', to = 'ru', ticket_id } = req.body
 
-  if (!text) {
-    return res.status(400).json({ error: 'No text provided' })
+  if (!text || !ticket_id) {
+    return res.status(400).json({ error: 'Text or ticket_id missing' })
   }
 
   try {
@@ -36,12 +35,31 @@ app.post('/translate', async (req, res) => {
       TargetLanguageCode: to
     })
 
-    const response = await client.send(command)
+    const response = await translateClient.send(command)
+    const translated = response.TranslatedText
 
-    res.json({ translated: response.TranslatedText })
+    // Отправляем перевод обратно в тикет (приватный комментарий)
+    await axios({
+      method: 'PUT',
+      url: `https://perfectsystems.zendesk.com/api/v2/tickets/${ticket_id}.json`,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Basic ${Buffer.from(`${process.env.ZENDESK_EMAIL}/token:${process.env.ZENDESK_API_TOKEN}`).toString('base64')}`
+      },
+      data: {
+        ticket: {
+          comment: {
+            body: `[Auto-translated]\n${translated}`,
+            public: false
+          }
+        }
+      }
+    })
+
+    res.json({ translated, sent_to_zendesk: true })
   } catch (error) {
-    console.error('❌ Translation error:', error)
-    res.status(500).json({ error: 'Translation failed' })
+    console.error('❌ Translation or Zendesk update error:', error?.response?.data || error.message)
+    res.status(500).json({ error: 'Translation or update failed' })
   }
 })
 
