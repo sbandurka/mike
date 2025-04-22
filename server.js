@@ -16,7 +16,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Simple translation server running')
+  res.send('✅ Minimal final translation server running')
 })
 
 app.post('/translate', async (req, res) => {
@@ -26,8 +26,8 @@ app.post('/translate', async (req, res) => {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
   }
 
-  if (text.startsWith('[AI]')) {
-    console.log('⛔ Skipping already processed comment.')
+  if (text.includes('[AI] [Auto-translated')) {
+    console.log('⛔ Skipping re-translation of AI-generated message')
     return res.status(200).json({ skipped: true })
   }
 
@@ -88,4 +88,4 @@ ${translated}`,
 })
 
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`🚀 Simple server running on port ${PORT}`))
+app.listen(PORT, () => console.log(`🚀 Minimal final server running on port ${PORT}`))
