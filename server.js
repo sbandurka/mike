@@ -2,7 +2,7 @@ import express from 'express'
 import { TranslateClient, TranslateTextCommand } from '@aws-sdk/client-translate'
 import dotenv from 'dotenv'
 import axios from 'axios'
-import franc from 'franc'
+import { franc } from 'franc'
 
 dotenv.config()
 const app = express()
