@@ -2,6 +2,7 @@ import express from 'express'
 import { TranslateClient, TranslateTextCommand } from '@aws-sdk/client-translate'
 import dotenv from 'dotenv'
 import axios from 'axios'
+import franc from 'franc'
 
 dotenv.config()
 const app = express()
@@ -16,7 +17,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Translation UI-enhanced server running')
+  res.send('✅ Translation server with language detection running')
 })
 
 app.post('/translate', async (req, res) => {
@@ -26,16 +27,25 @@ app.post('/translate', async (req, res) => {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
   }
 
-  // 🔒 Против циклов
   if (text.includes('[AI] [') || text.includes('자동 번역')) {
     console.log('⛔ Skipping AI-generated or already translated comment')
     return res.status(200).json({ skipped: true })
   }
 
-  // 🔒 Блокировать неверный перевод от клиента
   if (origin === 'client' && isPublic === true) {
     console.log('⛔ Client-origin public translation blocked')
     return res.status(200).json({ skipped: true })
+  }
+
+  const detectedLang = franc(text, { minLength: 3 })
+  console.log(`🌐 Detected language: ${detectedLang} for origin: ${origin}`)
+
+  if (origin === 'agent' && detectedLang !== 'rus') {
+    return res.status(200).json({ skipped: true, reason: 'Agent text not in Russian' })
+  }
+
+  if (origin === 'client' && detectedLang !== 'kor') {
+    return res.status(200).json({ skipped: true, reason: 'Client text not in Korean' })
   }
 
   try {
@@ -48,31 +58,13 @@ app.post('/translate', async (req, res) => {
     const response = await translateClient.send(command)
     const translated = response.TranslatedText
 
-    // 🌐 Форматированное тело
     let commentBody = ''
     if (from === 'ru' && to === 'ko' && isPublic) {
-      commentBody = `🇷🇺 → 🇰🇷 자동 번역
-
-📝 원문:
-${text}
-
-🔁 번역:
-${translated}`
+      commentBody = `🇷🇺 → 🇰🇷 자동 번역\n\n📝 원문:\n${text}\n\n🔁 번역:\n${translated}`
     } else if (from === 'ko' && to === 'ru' && !isPublic) {
-      commentBody = `🇰🇷 → 🇷🇺 [AI перевод]
-
-📝 Оригинал:
-${text}
-
-🔁 Перевод:
-${translated}`
+      commentBody = `🇰🇷 → 🇷🇺 [AI перевод]\n\n📝 Оригинал:\n${text}\n\n🔁 Перевод:\n${translated}`
     } else {
-      commentBody = `[AI] [${from} → ${to}]
-Оригинал:
-${text}
-
-Перевод:
-${translated}`
+      commentBody = `[AI] [${from} → ${to}]\nОригинал:\n${text}\n\nПеревод:\n${translated}`
     }
 
     const authHeader = {
@@ -101,4 +93,4 @@ ${translated}`
 })
 
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`🚀 UI-enhanced translation server running on port ${PORT}`))
+app.listen(PORT, () => console.log(`🚀 Language-detection translation server running on port ${PORT}`))
