@@ -16,7 +16,7 @@ const translateClient = new TranslateClient({
 })
 
 app.get('/', (req, res) => {
-  res.send('✅ Directional translation server running')
+  res.send('✅ Translation UI-enhanced server running')
 })
 
 app.post('/translate', async (req, res) => {
@@ -26,15 +26,15 @@ app.post('/translate', async (req, res) => {
     return res.status(400).json({ error: 'Text or ticket_id missing' })
   }
 
-  // 🔒 Полная защита от AI-циклов
-  if (text.includes('[AI] [')) {
-    console.log('⛔ Skipping AI-generated comment')
+  // 🔒 Против циклов
+  if (text.includes('[AI] [') || text.includes('자동 번역')) {
+    console.log('⛔ Skipping AI-generated or already translated comment')
     return res.status(200).json({ skipped: true })
   }
 
-  // 🔒 Предотвратить повторный public-перевод на клиентском вызове
+  // 🔒 Блокировать неверный перевод от клиента
   if (origin === 'client' && isPublic === true) {
-    console.log('⛔ Blocked client-originated public comment')
+    console.log('⛔ Client-origin public translation blocked')
     return res.status(200).json({ skipped: true })
   }
 
@@ -48,12 +48,32 @@ app.post('/translate', async (req, res) => {
     const response = await translateClient.send(command)
     const translated = response.TranslatedText
 
-    const combinedBody = `[AI] [${from} → ${to}]
+    // 🌐 Форматированное тело
+    let commentBody = ''
+    if (from === 'ru' && to === 'ko' && isPublic) {
+      commentBody = `🇷🇺 → 🇰🇷 자동 번역
+
+📝 원문:
+${text}
+
+🔁 번역:
+${translated}`
+    } else if (from === 'ko' && to === 'ru' && !isPublic) {
+      commentBody = `🇰🇷 → 🇷🇺 [AI перевод]
+
+📝 Оригинал:
+${text}
+
+🔁 Перевод:
+${translated}`
+    } else {
+      commentBody = `[AI] [${from} → ${to}]
 Оригинал:
 ${text}
 
 Перевод:
 ${translated}`
+    }
 
     const authHeader = {
       'Content-Type': 'application/json',
@@ -65,7 +85,7 @@ ${translated}`
       {
         ticket: {
           comment: {
-            body: combinedBody,
+            body: commentBody,
             public: isPublic
           }
         }
@@ -81,37 +101,4 @@ ${translated}`
 })
 
 const PORT = process.env.PORT || 3000
-// 🐞 Отладочный маршрут перевода без обновления тикета
-app.post('/translate-debug', async (req, res) => {
-  const { text, from = 'auto', to = 'ru' } = req.body
-
-  if (!text) {
-    return res.status(400).json({ error: 'Missing text for translation' })
-  }
-
-  console.log(`📤 [DEBUG] Переводим: "${text}" (${from} → ${to})`)
-
-  try {
-    const command = new TranslateTextCommand({
-      Text: text,
-      SourceLanguageCode: from,
-      TargetLanguageCode: to
-    })
-
-    const response = await translateClient.send(command)
-
-    console.log(`✅ [DEBUG] Перевод: "${response.TranslatedText}"`)
-
-    res.json({
-      original: text,
-      translated: response.TranslatedText,
-      from,
-      to
-    })
-  } catch (error) {
-    console.error('❌ [DEBUG] Ошибка при переводе:', error?.message || error)
-    res.status(500).json({ error: 'Translation failed' })
-  }
-})
-
-app.listen(PORT, () => console.log(`🚀 Directional-safe server running on port ${PORT}`))
+app.listen(PORT, () => console.log(`🚀 UI-enhanced translation server running on port ${PORT}`))
